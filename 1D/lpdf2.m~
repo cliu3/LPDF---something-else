@@ -1,0 +1,68 @@
+close all;clear all;
+fname = '~/Dropbox/IBM/MALT/examples/run/bb_out_2008c.nc';
+% nbin = 1000;
+% sigma = 25;
+sigmap = 1000;  %in meters
+binp = 25;      %in meters
+wrfac = 15;
+
+% load the mass coastline
+load coast_mass_25k_xy.mat
+
+% open the mesh file
+nc = netcdf('~/Dropbox/IBM/MALT/examples/preproc/scp4.1_grid.nc','nowrite');
+xm = nc{'x'}(:);
+ym = nc{'y'}(:);
+xc = nc{'xc'}(:);
+yc = nc{'yc'}(:);
+hm = nc{'h'}(:);
+nv = nc{'nv'}(:)';
+art1 = nc{'art1'}(:)';
+
+% open the particle data
+nc = netcdf(fname,'nowrite');
+
+xp = nc{'x'}(end,:);
+yp = nc{'y'}(end,:);
+incell = nc{'incell'}(end,:);
+nlag   = numel(xp);
+xr=max(xp)-min(xp);
+yr=max(yp)-min(yp);
+nbinx = ceil(xr/binp);
+nbiny = ceil(yr/binp);
+% sigma = ceil(sigmap/binp)*ones(nlag,1);
+% X = min(xp):binp:max(xp);
+% Y = min(yp):binp:max(yp);
+ar = xr/yr;
+a=0.25*ar*yr;
+b=0.75*ar*yr-0.5*yr;
+
+data = [xp;yp]';
+
+for i=3:10
+    [bandwidth,density,X,Y]=kde2d(data,2^i,[min(xp)-a,min(yp)-b],[max(xp)+a,max(yp)+b]);
+    % density = density/sum(sum(density));
+    pcolor(X,Y,density);shading flat;colorbar; hold on; %plot(xp,yp,'w.'); hold on;
+    plot(coast(:,1),coast(:,2),'k','LineWidth',2);
+    axis([8.3e5,8.7e5,-1.6e5,-1.2e5]);
+
+    PDF = interp2(X,Y,density,xm,ym);
+
+    figure
+    patch('Vertices',[xm,ym],'Faces',nv,...
+            'Cdata',PDF,'edgecolor','interp','facecolor','interp');
+    colorbar;axis([8.3e5,8.7e5,-1.6e5,-1.2e5]);
+    hold on;
+
+    PDF(isnan(PDF))=0;
+    loss(i)=1-dot(art1,PDF)
+end
+close all;
+loss(1:2)=NaN;
+plot(loss)
+set(gca,'XTick',3:10)
+tick=[3:10];
+tick=2.^tick;
+set(gca,'XTickLabel',tick)
+
+PDF=PDF*1e6;
